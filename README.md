@@ -23,3 +23,15 @@ pkgs_dirs:
 
 channel_priority: strict
 ```
+
+I started by downloading `megahit`, `fastqc`, and `fastp` into the `sebastian.yml` env.
+
+The code below creates a yaml config file for the env name sebastian:
+```
+`conda env export --from-history --name sebastian > "sebastian_env.yml"`
+```
+
+To install:
+```
+conda create --file sebastian.yml
+```
