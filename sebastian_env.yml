@@ -1,0 +1,9 @@
+name: sebastian
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - fastp
+  - fastqc
+  - megahit
