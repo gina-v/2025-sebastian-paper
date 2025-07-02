@@ -33,5 +33,5 @@ The code below creates a yaml config file for the env name sebastian:
 
 To install:
 ```
-conda create --file sebastian.yml
+conda env create --file sebastian_env.yml
 ```
