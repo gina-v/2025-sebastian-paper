@@ -7,3 +7,13 @@ dependencies:
   - fastp
   - fastqc
   - megahit
+  - prodigal
+  - requests
+  - biopython
+  - blast
+  - minimap2
+  - samtools
+  - bwa
+  - bedtools
+  - seqtk
+prefix: /home/baumlerc/miniforge3/envs/sebastian
