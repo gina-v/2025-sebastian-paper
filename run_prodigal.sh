@@ -48,10 +48,16 @@ done
 # https://genomicsaotearoa.github.io/hts_workshop_mpi/level2/42_annotation_prodigal/#predicting-protein-coding-regions
 for sample in "${!CONTIGS[@]}"; do
     echo "Running prodigal on $sample..."
+    base=$(basename $sample)
+    echo "for $base"
+    echo "${CONTIGS[$sample]}"
+
+    # Metagenome mode, # Treat runs of N as masked sequence; dont build genes across them.
     prodigal \
-        -p meta #This is a metagenome \
-        -i "${CONTIGS[$sample]:-}" #the input file\
-        -d "$OUTDIR/${sample}.prod.fna" \
-        -a "$OUTDIR/${sample}.prod.faa" \
-        -o "$OUTDIR/${sample}.prod.gbk"
+        -p meta \
+        -m \
+        -i "${CONTIGS[$sample]}" \
+        -d "$OUTDIR${base}.prod.fna" \
+        -a "$OUTDIR${base}.prod.faa" \
+        -o "$OUTDIR${base}.prod.gbk"
 done
