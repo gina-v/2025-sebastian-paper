@@ -1,0 +1,6 @@
+metadata_file_path: metadata/working_metadata.tsv
+
+test: True
+
+output_directory: /group/ctbrowngrp4/2025-ccbaumler-team-tartrate
+

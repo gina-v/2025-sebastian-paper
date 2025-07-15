@@ -1,0 +1,15 @@
+name: sra-download
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - sra-tools=3.1.1
+  - seqtk
+  - ca-certificates
+  - certifi
+  - openssl
+  - defusedxml
+  - pip:
+    - awscli==1.29.20
+
