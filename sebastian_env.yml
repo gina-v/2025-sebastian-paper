@@ -9,11 +9,8 @@ dependencies:
   - megahit
   - prodigal
   - requests
-  - biopython
   - blast
   - minimap2
   - samtools
-  - bwa
-  - bedtools
-  - seqtk
+  - polars
 prefix: /home/baumlerc/miniforge3/envs/sebastian
