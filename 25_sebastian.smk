@@ -3,16 +3,30 @@
 ###
 
 import csv
+import itertools
 
 configfile: "./config.yaml"
 
+def sniff_delimiter(file_path, sample_size=2048):
+    with open(file_path, 'r') as fp:
+        sample = fp.read(sample_size)
+        return csv.Sniffer().sniff(sample).delimiter
+
 SAMPLES = []
-with open(config['metadata_file_path'], mode='r', newline='') as fp:
-    reader = csv.DictReader(fp, delimiter='\t')
-    for i, row in enumerate(reader):
-        if config.get('test') and i >= 5:
-            break
+SYMBOLS = []
+max_rows = 5 if config.get("test") else None
+sample_delim = sniff_delimiter(config['sample_metadata'])
+symbol_delim = sniff_delimiter(config['gene_metadata'])
+
+with open(config['sample_metadata'], mode='r', newline='') as fp:
+    reader = csv.DictReader(fp, delimiter=sample_delim)
+    for row in itertools.islice(reader, max_rows):
         SAMPLES.append(row['run'])
+
+with open(config['gene_metadata'], mode='r', newline='') as fp:
+    reader = csv.DictReader(fp, delimiter=symbol_delim)
+    for row in itertools.islice(reader, max_rows):
+        SYMBOLS.append(row['symbol'])
 
 OUTDIR = [ config.get('output_directory') if config.get('output_directory') is not None else './workflow-results' ]
 
@@ -21,7 +35,9 @@ HICPUS_JOBS = {1: ['low2', 1], 2: ['low2', 1], 3: ['med2', 25], 4: ['med2', 25],
 BIGMEM_JOBS = {1: ['bml', 1], 2: ['bml', 1], 3: ['bmm', 25], 4: ['bmm', 25], 5: ['bmh', 50]}
 
 wildcard_constraints:
-    sample = "[a-zA-Z0-9]+"
+    sample = "(SRR|ERR|DRR)\d+",
+    symbol = "(?!SRR|ERR|DRR)[A-Z0-9_]+(?:\.[0-9]+)?"
+
 
 # how does snakemake work if you need to activate a conda environment or request resources?
 # change to general paths so this is usable for Colton 
@@ -33,7 +49,7 @@ rule all:
    # expand("{o}/fastp_output/trim/{sample}_2_trim.fastq", sample = ALL_NAMES),
    # expand("{o}/fastp_output/trim/reports/{sample}_trim.json", sample = ALL_NAMES),
    # expand("{o}/fastp_output/trim/reports/{sample}_trim.html", sample = ALL_NAMES),
-    expand("{o}/mapped_reads/stats/{sample}_mapping_stats.tsv", o=OUTDIR, sample=SAMPLES),
+    expand("{o}/mapped_reads/stats/{sample}.x.{symbol}_mapping_stats.tsv", o=OUTDIR, sample=SAMPLES, symbol=SYMBOLS),
    # expand("{o}/mapped_reads/stats/{sample}.sorted.bam.bai", sample=ALL_NAMES),
    # expand("{o}/blastp_results/{sample}_blast_filtered.csv", sample=ALL_NAMES),
    # "{o}/prodigal_output/combined_prodigal.faa",
@@ -211,7 +227,7 @@ rule dump_fastq:
         else
             echo "Read or base counts do not match!!!"
             rm "$R1" "$R2"
-            fastq-dump --disable-multithreading --fasta 0 --skip-technical --readids --read-filter pass --dumpbase --split-spot --clip {input.sra_file}
+            fastq-dump --disable-multithreading --skip-technical --split-files --clip {input.sra_file} -O "$MYTMP"
         fi
 
         echo ''
@@ -288,7 +304,7 @@ rule megahit:
     trim1 = "{o}/fastp_output/trim/{sample}_1_trim.fastq",
     trim2 = "{o}/fastp_output/trim/{sample}_2_trim.fastq",
   output:
-    contigs = "{o}/megahit_output/{sample}/final_contigs.fa",
+    contigs = "{o}/megahit_output/{sample}/final.contigs.fa",
   conda: "envs/sebastian_env.yml"
   threads: 16
   resources:
@@ -300,20 +316,34 @@ rule megahit:
     partition= lambda wildcards, attempt: HICPUS_JOBS[attempt][0],
   shell:
     """
+    # Define expected and temporary output directories
+    expected_outdir="{wildcards.o}/megahit_output/{wildcards.sample}"
+    timestamp=$(date +"%Y%m%d_%H%M%S")
+    tmp_outdir="${{expected_outdir}}_${{timestamp}}"
+
+    # Run MEGAHIT with a unique directory
     megahit \
       -1 {input.trim1} \
       -2 {input.trim2} \
-      -o {wildcards.o}/megahit_output/{wildcards.sample} \
-      -t {threads}
+      -o "$tmp_outdir" \
+      -t {threads} \
+      --continue
+
+    # Move contents to expected output directory
+    mkdir -p "$expected_outdir"
+    mv "$tmp_outdir"/* "$expected_outdir"/
+
+    # Clean up the temp directory
+    rmdir "$tmp_outdir"
     """    
 
 rule prodigal:
   input:
-    contigs = "{o}/megahit_output/{sample}/final_contigs.fa",
+    contigs = "{o}/megahit_output/{sample}/final.contigs.fa",
   output:
-    fna = "{o}/prodigal_output/{sample}_prod.fna",
-    faa = "{o}/prodigal_output/{sample}_prod.faa",
-    gbk = "{o}/prodigal_output/{sample}_prod.gbk",
+    fna = "{o}/prodigal_output/{sample}.prod.fna",
+    faa = "{o}/prodigal_output/{sample}.prod.faa",
+    gbk = "{o}/prodigal_output/{sample}.prod.gbk",
   conda: "envs/sebastian_env.yml"
   resources:
     mem_mb = lambda wildcards, attempt: 24 * 1024 * attempt,
@@ -335,7 +365,7 @@ rule prodigal:
 
 rule combine_prodigal: #Review the shell script because I need to change the header in the files
   input:
-    faa = expand("{o}/prodigal_output/{sample}_prod.faa", o=OUTDIR, sample = SAMPLES),
+    faa = expand("{o}/prodigal_output/{sample}.prod.faa", o=OUTDIR, sample = SAMPLES),
   output:
     combined_faa = "{o}/prodigal_output/combined_prodigal.faa"
   conda: "envs/sebastian_env.yml"
@@ -354,7 +384,7 @@ rule blastp_database:
     phr = "{o}/blast_dbs/prodigal_db.phr",
     psq = "{o}/blast_dbs/prodigal_db.psq"
   params:
-    out_prefix = "blast_dbs/prodigal_db"
+    out_prefix = "{o}/blast_dbs/prodigal_db"
   resources:
     mem_mb = lambda wildcards, attempt: 24 * 1024 * attempt,
     disk_mb = lambda wildcards, attempt: 24 * 1024 * attempt,
@@ -367,13 +397,34 @@ rule blastp_database:
     """
     makeblastdb -in {input.combined_faa} -dbtype prot -out {params.out_prefix}
     """
-    
+
+rule get_gene_seq:
+    input:
+        csv = 'metadata/genes-to-get.csv',
+        seq_script = 'scripts/get-gene-seq.py',
+    output:
+        pgenes = '{o}/gene-seqs/{symbol}_data/protein.faa',
+    conda: "envs/requests.yaml",
+    shell:"""
+        awk -F',' -v sym="{wildcards.symbol}" 'NR==1 {{next}} $1 == sym {{
+            printf "Running for symbol=%s, organism=%s, db=%s\\n", $1, $3, $5;
+            printf "python {input.seq_script} --genes %s --organism %s --extract -db %s --all-annotation --ext-dir {wildcards.o}/gene-seqs/", $1, $3, $5;
+            cmd = sprintf("python {input.seq_script} --genes %s --organism %s --extract -db %s --all-annotation --ext-dir {wildcards.o}/gene-seqs/", $1, $3, $5);
+            system(cmd);
+        }}' {input.csv}
+
+        grep "{wildcards.symbol}" {output.pgenes}
+    """
+
 rule blastp: # should we make a bastn rule and a blastn_db?
   input:
-    faa = "{o}/prodigal_output/{sample}_prod.faa",
-    db = "{o}/blast_dbs/prodigal_db.psq"
+    genes = "{o}/gene-seqs/{symbol}_data/protein.faa",
+    db = "{o}/blast_dbs/prodigal_db.pin"
   output:
-     csv = "{o}/blastp_results/{sample}_blast_output.csv"
+     temp = temporary("{o}/blastp_results/temp_{symbol}_blast.csv"),
+     csv = "{o}/blastp_results/{symbol}_blast_output.csv",
+  params:
+     db = "{o}/blast_dbs/prodigal_db"
   resources:
     mem_mb = lambda wildcards, attempt: 24 * 1024 * attempt,
     disk_mb = lambda wildcards, attempt: 24 * 1024 * attempt,
@@ -385,22 +436,23 @@ rule blastp: # should we make a bastn rule and a blastn_db?
   shell:
     """
     blastp \
-      -query {input.faa} \
-      -db {wildcards.o}/blast_dbs/prodigal_db \
+      -query {input.genes} \
+      -db {params.db} \
       -outfmt "10 qseqid sseqid pident length evalue bitscore" \
-      -out temp_{wildcards.sample}_blast.txt
+      -out {output.temp}
 
     cat <(printf "qseqid,sseqid,pident,length,e_value,bit_score\\n") \
-        temp_{wildcards.sample}_blast.txt > {output.csv}
+        {output.temp} > {output.csv}
     """
  
 rule parse_blast_output:
   input:
-    csv = "{o}/blastp_results/{sample}_blast_output.csv"
+    csv = "{o}/blastp_results/{symbol}_blast_output.csv",
+    script = "scripts/parse_blast_output.py",
   output:
-    filtered = "{o}/blastp_results/{sample}_blast_filtered.csv"
+    filtered = "{o}/blastp_results/{symbol}_blast_filtered.csv"
   params:
-    cutoff = "1e-100"
+    cutoff = "1e-07"
   resources:
     mem_mb = lambda wildcards, attempt: 24 * 1024 * attempt,
     disk_mb = lambda wildcards, attempt: 24 * 1024 * attempt,
@@ -411,7 +463,7 @@ rule parse_blast_output:
   conda: "envs/sebastian_env.yml"
   shell:
     """
-    ./parse_blast_output.py {input.csv} \
+    {input.script} {input.csv} \
       -o {output.filtered} \
       --cutoff {params.cutoff} \
       --verbose
@@ -419,11 +471,12 @@ rule parse_blast_output:
     # look at this py script to see what output files. I need a contigs list fna file for downstream rules
 rule make_contig_list: 
   input:
-    blastp_hits = "{o}/blastp_results/{sample}_blast_filtered.csv"
+    blastp_hits = "{o}/blastp_results/{symbol}_blast_filtered.csv",
+    script = "scripts/extract_prodigal_contigs.py",
   output:
-    contig_list_csv = "{o}/contiglists/{sample}_contigs.csv",
-    contig_list_fna = "{o}/contiglists/{sample}_contigs.fna"
+    contig_list_fna = "{o}/contiglists/{sample}.x.{symbol}.contiglist.fna"
   params:
+    contig_list_csv = "{o}/contiglist.csv",
     fna_dir = "{o}/prodigal_output/", 
     fna_ext = "fna"
   resources:
@@ -436,22 +489,22 @@ rule make_contig_list:
   conda: "envs/sebastian_env.yml"
   shell:
     """
-    ./extract_prodigal_contigs.py {input.blastp_hits} \
+    {input.script} {input.blastp_hits} \
       -v \
-      -o {output.contig_list_csv} \
+      -o {params.contig_list_csv} \
       -d {params.fna_dir} \
       -f {params.fna_ext} \
-      --outdir $(dirname {output.contig_list_csv})
+      --outdir $(dirname {output.contig_list_fna})
     """
 
 rule minimap2:
   input:
-    contig_list_fna = "{o}/contiglists/{sample}_contigs.fna",
+    contig_list_fna = "{o}/contiglists/{sample}.x.{symbol}.contiglist.fna",
     fq1 = "{o}/fastq/{sample}_1.fastq.gz",
     fq2 = "{o}/fastq/{sample}_2.fastq.gz"
   output:
-    sorted_bam = "{o}/mapped_reads/{sample}.sorted.bam"
-  threads: 8
+    sorted_bam = "{o}/mapped_reads/{sample}.x.{symbol}.sorted.bam"
+  threads: 16
   resources:
     mem_mb = lambda wildcards, attempt: 24 * 1024 * attempt,
     disk_mb = lambda wildcards, attempt: 24 * 1024 * attempt,
@@ -470,9 +523,9 @@ rule minimap2:
    
 rule index_bam:
   input:
-    sorted_bam = "{o}/mapped_reads/{sample}.sorted.bam"
+    sorted_bam = "{o}/mapped_reads/{sample}.x.{symbol}.sorted.bam"
   output:
-    sorted_bai = "{o}/mapped_reads/stats/{sample}.sorted.bam.bai"
+    sorted_bai = "{o}/mapped_reads/{sample}.x.{symbol}.sorted.bam.bai"
   conda: "envs/sebastian_env.yml"
   resources:
     mem_mb = lambda wildcards, attempt: 24 * 1024 * attempt,
@@ -483,15 +536,18 @@ rule index_bam:
     partition= lambda wildcards, attempt: BIGMEM_JOBS[attempt][0],
   shell:
     """
-    samtools \
-    index {input.sorted_bam}
+    samtools index {input.sorted_bam}
     """
 
 rule reads_mapped:
   input:
-    sorted_bam = "{o}/mapped_reads/{sample}.sorted.bam"
+    sorted_bam = "{o}/mapped_reads/{sample}.x.{symbol}.sorted.bam.bai",
+    bam = "{o}/mapped_reads/{sample}.x.{symbol}.sorted.bam",
+    script = "scripts/aggregating_depth.py",
   output:
-    stats = "{o}/mapped_reads/stats/{sample}_mapping_stats.tsv"
+    map = "{o}/mapped_reads/stats/{sample}.x.{symbol}_mapping_stats.tsv",
+    coverage = "{o}/mapped_reads/stats/{sample}.x.{symbol}_coverage_stats.tsv",
+    ave_cov = "{o}/mapped_reads/stats/{sample}.x.{symbol}_average_coverage_stats.tsv",
   resources:
     mem_mb = lambda wildcards, attempt: 24 * 1024 * attempt,
     disk_mb = lambda wildcards, attempt: 24 * 1024 * attempt,
@@ -502,7 +558,11 @@ rule reads_mapped:
   conda: "envs/sebastian_env.yml"
   shell:
     """
-      (echo -e "contig\tlength\tmapped\tunmapped\tnet_mapped"; \
-    samtools idxstats {input.sorted_bam} | \
-    awk -F'\t' '{{print $0 "\t" ($3 - $4)}}')
+    (echo -e "contig\tlength\tmapped\tunmapped\tnet_mapped"; \
+    samtools idxstats {input.bam} | \
+    awk -F'\t' '{{print $0 "\t" ($3 - $4)}}') > {output.map}
+
+    samtools depth -aa {input.bam} > {output.coverage}
+
+    {input.script} {output.coverage} {output.ave_cov}
     """

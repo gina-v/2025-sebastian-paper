@@ -1,5 +1,6 @@
 #! /usr/bin/env python
 
+import os
 import argparse
 import csv
 import sys
@@ -51,8 +52,8 @@ def main():
         total = len(contigs)
         write_record = False
 
-        full_prod_path = args.prodigal_dir + seq_file.strip().split(".")[0] + ".prod." + args.prodigal_filetype
-        full_contig_path = args.outdir + seq_file.strip().split(".")[0] + ".x." + qseqid + ".contiglist." + args.prodigal_filetype
+        full_prod_path = os.path.join(args.prodigal_dir, seq_file.strip().split(".")[0] + ".prod." + args.prodigal_filetype)
+        full_contig_path = os.path.join(args.outdir, seq_file.strip().split(".")[0] + ".x." + qseqid + ".contiglist." + args.prodigal_filetype)
         if args.verbose: print(f"\nRetrieving {full_prod_path}")
 
         with open(full_prod_path) as fin, open(full_contig_path, 'w') as fout:
@@ -68,7 +69,7 @@ def main():
                 elif write_record:
                     fout.write(line)
 
-        print(f"Finished. Found {found} of {total} contigs for {seq_file}.\nFor the BLAST'd sequence {qseqid}:\nSample {seq_filename}: {', '.join(contigs)}")
+        print(f"Finished. Found {found} of {total} contigs for {seq_file}.\nFor the BLAST'd sequence {qseqid}:\nSample {seq_file}: {', '.join(contigs)}")
 
         if args.verbose: print(f"Writing to {full_contig_path}\n")
 

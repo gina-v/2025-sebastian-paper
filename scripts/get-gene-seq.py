@@ -110,6 +110,7 @@ def main():
     p.add_argument('-db', '--database', default='gene', type=str, help='Choose the ncbi database to search ("protein" or "gene")')
     p.add_argument("-o", "--output", type=check_zip_extension, default="ncbi_genes.zip", help="Output ZIP filename (Must end in '.zip')")
     p.add_argument("--extract", action="store_true", help="Extract sequence files from downloaded ZIP")
+    p.add_argument("--ext-dir", help="Extract directory for sequence files from downloaded ZIP")
     args = p.parse_args()
 
     if not EMAIL or not API_KEY:
@@ -123,18 +124,18 @@ def main():
 
         download_gene_sequences(gene_id, args.database, args.output, args.all_annotation)
     else:
-        gene_id = args.genes
+        symbol = args.genes
 
-        download_gene_sequences(gene_id, args.database, args.output, args.all_annotation)
+        download_gene_sequences(symbol, args.database, args.output, args.all_annotation)
 
-        symbol = get_gene_symbol(args.genes, args.database)
-        symbol = 'NR' if symbol == None else symbol
-        print(f"✔ {gene_id} → Gene symbol {symbol}")
+        gene_id = get_gene_symbol(args.genes, args.database)
+        gene_id = 'NR' if gene_id == None else gene_id
+        print(f"✔ {symbol} → Gene ID {gene_id}")
 
-    sleep(0.34)  # be polite, only 3 requests per second
+    sleep(1)  # be polite, only 3 requests per second
 
     if args.extract:
-        extract_dir = symbol + '_' + gene_id + "_data"
+        extract_dir = os.path.join(args.ext_dir, symbol + "_data") if args.ext_dir else symbol + "_data" # '_' + gene_id + "_data"
         os.makedirs(extract_dir, exist_ok=True)
         extract_file_from_zip(args.output, extract_dir)
 

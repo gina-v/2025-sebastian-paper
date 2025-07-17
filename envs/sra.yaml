@@ -5,6 +5,7 @@ channels:
   - defaults
 dependencies:
   - sra-tools=3.1.1
+  - seqkit=2.8.2
   - seqtk
   - ca-certificates
   - certifi
