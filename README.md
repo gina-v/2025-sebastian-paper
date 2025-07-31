@@ -28,12 +28,93 @@ I started by downloading `megahit`, `fastqc`, and `fastp` into the `sebastian.ym
 
 The code below creates a yaml config file for the env name sebastian:
 ```
-`conda env export --from-history --name sebastian > "sebastian_env.yml"`
+conda env export --from-history --name sebastian > "sebastian_env.yml"
 ```
 
 To install:
 ```
 conda env create --file sebastian_env.yml
+```
+
+# Metadata manipulation
+
+To count all the variables in a tsv file for the diagnosis column:
+```
+awk -F'\t' '{count[$8]++} END {for (val in count) print val, count[val]}' metadata/working_metadata.tsv
+```
+which returns:
+```
+ 1
+diagnosis 1
+CD 566
+UC 122
+nonIBD 372
+```
+
+To see the unique values in a tsv file for the projects column:
+```
+awk -F'\t' '{print $1}' metadata/working_metadata.tsv | sort | uniq
+```
+The values returned are:
+```
+PRJNA237362
+PRJNA237362
+PRJEB2054
+PRJNA237362
+PRJNA385949
+PRJNA400072
+SRP057027
+study_accession
+```
+
+Notice there are a few repeated values... that's unexpected.
+```
+awk -F'\t' '{print $1}' metadata/working_metadata.tsv | sort | uniq -c | sort -nr
+```
+The repeated unique values must contain a whitespace character (or some other invisible unicode character) somewhere in their string:
+```
+    448 PRJNA237362
+    263 PRJEB2054
+    218 PRJNA400072
+    112 SRP057027
+     17 PRJNA385949
+      1 study_accession
+      1 PRJNA237362
+      1 PRJNA237362
+      1
+```
+
+
+# Some helpful bash commands
+
+Find all the files that are greater that 64 bits in size. Count them all.
+```
+find /group/ctbrowngrp/2025-ccbaumler-team-tartrate/mapped_reads/stats/ -size +64 -print | wc -l
+```
+
+List all the files in a human readable format by the time modified in reverse order:
+```
+ls -lathr /group/ctbrowngrp/2025-ccbaumler-team-tartrate/mapped_reads/stats/
+```
+
+Return how much diskspace is currently available:
+```
+df -h /group/ctbrowngrp 
+```
+
+Update the timestamp on all the files in a directory and its sub-directories:
+```
+find /group/ctbrowngrp/2025-ccbaumler-team-tartrate/contiglists/ -exec touch {} +
+```
+
+Look at the queue of all jobs running in my group but exclude my running jobs:
+```
+(squeue -A ctbrowngrp -o "%.10i %.10u %.10P %.20j %.2t %.10M %.4C %.6D %.10m %R" | head -n 1 && squeue -A ctbrowngrp -o "%.10i %.10u %.10P %.20j %.2t %.10M %.4C %.6D %.10m %R"| awk -v user="$USER" 'NR>1 && $2 != user')
+```
+
+Watch the changes in my squeue:
+```
+watch 'squeue --me -o "%.10i %.10P %.20j %.2t %.10M %.4C %.6D %.10m %R"'
 ```
 
 # Gina, here is a workflow!

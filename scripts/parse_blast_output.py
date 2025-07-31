@@ -52,7 +52,8 @@ def main():
             try:
                 e_value = float(row['e_value'])
 
-                if args.cutoff is None or e_value < args.cutoff:
+                if args.cutoff is None or e_value < args.cutoff: #The closer to 0 the e-value the better
+
                     seq_filename, sseq_id = split_sseqid(row['sseqid'])
 
                     output_row = {

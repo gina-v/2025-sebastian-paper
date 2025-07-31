@@ -1,6 +1,8 @@
-metadata_file_path: metadata/working_metadata.tsv
+sample_metadata: metadata/working_metadata.tsv
 
-test: True
+gene_metadata: metadata/genes-to-get.csv
 
-output_directory: /group/ctbrowngrp4/2025-ccbaumler-team-tartrate
+test: False
+
+output_directory: /group/ctbrowngrp/2025-ccbaumler-team-tartrate
 
