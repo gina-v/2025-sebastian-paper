@@ -36,6 +36,15 @@ To install:
 conda env create --file sebastian_env.yml
 ```
 
+# GZIP errors
+
+I have built in some gzip work arounds for fastp
+
+But sometimes a sample file gets through to megahit with a bad gzip compression to work around this:
+
+1. make sure to run snakemake with `-k` to run everything else until the offending error is all that is left
+2. run the `gzip-checker.sh` script in a `srun` with 64gb and 100 cpus
+
 # Metadata manipulation
 
 To count all the variables in a tsv file for the diagnosis column:

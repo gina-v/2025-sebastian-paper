@@ -79,8 +79,8 @@ rule download_sra:
         disk_mb = lambda wildcards, attempt: 8 * 1024 * attempt,
         time = lambda wildcards, attempt: 1.5 * 60 * attempt,
         runtime = lambda wildcards, attempt: 1.5 * 60 * attempt,
-        allowed_jobs= lambda wildcards, attempt: BIGMEM_JOBS[attempt][1], #HICPUS_JOBS[attempt][1],
-        partition= lambda wildcards, attempt: BIGMEM_JOBS[attempt][0],
+        allowed_jobs = lambda wildcards, attempt: HICPUS_JOBS[attempt][1],
+        partition = lambda wildcards, attempt: HICPUS_JOBS[attempt][0],
     conda:
         "envs/sra.yaml"
     shell:
@@ -124,8 +124,8 @@ rule dump_fastq:
         disk_mb = lambda wildcards, attempt: 16 * 1024 * attempt,
         time = lambda wildcards, attempt: 1.5 * 60 * attempt,
         runtime = lambda wildcards, attempt: 1.5 * 60 * attempt,
-        allowed_jobs= lambda wildcards, attempt: BIGMEM_JOBS[attempt][1], #HICPUS_JOBS[attempt][1],
-        partition= lambda wildcards, attempt: BIGMEM_JOBS[attempt][0], #HICPUS_JOBS[attempt][0],
+        allowed_jobs = lambda wildcards, attempt: HICPUS_JOBS[attempt][1],
+        partition = lambda wildcards, attempt: HICPUS_JOBS[attempt][0],
     threads:
         16
     params:
@@ -269,7 +269,7 @@ rule fastp:
     disk_mb = lambda wildcards, attempt: 16 * 1024 * attempt,
     time = lambda wildcards, attempt: 1.5 * 60 * attempt,
     runtime = lambda wildcards, attempt: 1.5 * 60 * attempt,
-    allowed_jobs= lambda wildcards, attempt: BIGMEM_JOBS[attempt][1],
+    allowed_jobs = lambda wildcards, attempt: BIGMEM_JOBS[attempt][1],
     partition= lambda wildcards, attempt: BIGMEM_JOBS[attempt][0],
   conda: "envs/sebastian_env.yml"
   shell:
@@ -283,12 +283,11 @@ rule fastp:
           --json {output.json} \
           --html {output.html} 2> {output.log} || fallback=1
 
-        #fastp uses a more strict unzip software that is causing errors. This should fix it.
         if grep -q "igzip: unexpected eof" {output.log} ; then
             echo "igzip error detected — retrying with manual decompression..."
             fastp \
-              --in1 <(gunzip -c {input.fq1}) \
-              --in2 <(gunzip -c {input.fq2}) \
+              --in1 <(gunzip -c {input.fq1}) \ #decompress and read in
+              --in2 <(gunzip -c {input.fq2}) \ #decompress and read in
               --out1 {output.trim1} \
               --out2 {output.trim2} \
               --json {output.json} \
@@ -310,7 +309,7 @@ rule fastqc:
     disk_mb = lambda wildcards, attempt: 16 * 1024 * attempt,
     time = lambda wildcards, attempt: 1.5 * 60 * attempt,
     runtime = lambda wildcards, attempt: 1.5 * 60 * attempt,
-    allowed_jobs= lambda wildcards, attempt: BIGMEM_JOBS[attempt][1],
+    allowed_jobs = lambda wildcards, attempt: BIGMEM_JOBS[attempt][1],
     partition= lambda wildcards, attempt: BIGMEM_JOBS[attempt][0],
   conda: "envs/sebastian_env.yml"
   shell:
@@ -335,8 +334,8 @@ rule megahit:
     disk_mb = lambda wildcards, attempt: 24 * 1024 * attempt,
     time = lambda wildcards, attempt: 8 * 60 * attempt,
     runtime = lambda wildcards, attempt: 8 * 60 * attempt,
-    allowed_jobs= lambda wildcards, attempt: HICPUS_JOBS[attempt][1],
-    partition= lambda wildcards, attempt: BIGMEM_JOBS[attempt][0], #HICPUS_JOBS[attempt][0],
+    allowed_jobs = lambda wildcards, attempt: HICPUS_JOBS[attempt][1],
+    partition= lambda wildcards, attempt: HICPUS_JOBS[attempt][0],
   shell:
     """
     # Define expected and temporary output directories
@@ -374,14 +373,14 @@ rule prodigal:
   output:
     fna = "{o}/prodigal_output/{sample}.prod.fna",
     faa = "{o}/prodigal_output/{sample}.prod.faa",
-    gbk = "{o}/prodigal_output/{sample}.prod.gbk",
+    #gbk = "{o}/prodigal_output/{sample}.prod.gbk",
   conda: "envs/sebastian_env.yml"
   resources:
     mem_mb = lambda wildcards, attempt: 24 * 1024 * attempt,
     disk_mb = lambda wildcards, attempt: 24 * 1024 * attempt,
     time = lambda wildcards, attempt: 8 * 60 * attempt,
     runtime = lambda wildcards, attempt: 8 * 60 * attempt,
-    allowed_jobs= lambda wildcards, attempt: BIGMEM_JOBS[attempt][1],
+    allowed_jobs = lambda wildcards, attempt: BIGMEM_JOBS[attempt][1],
     partition= lambda wildcards, attempt: BIGMEM_JOBS[attempt][0],
   shell:
     """
@@ -391,7 +390,7 @@ rule prodigal:
       -i {input.contigs} \
       -d {output.fna} \
       -a {output.faa} \
-      -o {output.gbk}
+    #  -o #gbk option
     """
 
 rule combine_prodigal: #Review the shell script because I need to change the header in the files
@@ -405,7 +404,7 @@ rule combine_prodigal: #Review the shell script because I need to change the hea
     disk_mb = lambda wildcards, attempt: 4 * 1024 * attempt,
     time = lambda wildcards, attempt: 2 * 60 * attempt,
     runtime = lambda wildcards, attempt: 2 * 60 * attempt,
-    allowed_jobs= lambda wildcards, attempt: BIGMEM_JOBS[attempt][1],
+    allowed_jobs = lambda wildcards, attempt: BIGMEM_JOBS[attempt][1],
     partition= lambda wildcards, attempt: BIGMEM_JOBS[attempt][0],
   shell:
     """
@@ -427,7 +426,7 @@ rule blastp_database:
     disk_mb = lambda wildcards, attempt: 24 * 1024 * attempt,
     time = lambda wildcards, attempt: 8 * 60 * attempt,
     runtime = lambda wildcards, attempt: 8 * 60 * attempt,
-    allowed_jobs= lambda wildcards, attempt: BIGMEM_JOBS[attempt][1],
+    allowed_jobs = lambda wildcards, attempt: BIGMEM_JOBS[attempt][1],
     partition= lambda wildcards, attempt: BIGMEM_JOBS[attempt][0],
   conda: "envs/sebastian_env.yml"
   shell:
@@ -437,11 +436,13 @@ rule blastp_database:
 
 rule get_gene_seq:
     input:
-        csv = 'metadata/genes-to-get.csv',
+        csv = config['gene_metadata'],
         seq_script = 'scripts/get-gene-seq.py',
     output:
         pgenes = '{o}/gene-seqs/{symbol}_data/protein.faa',
     conda: "envs/requests.yaml",
+    resources:
+        exclusive = 1
     shell:"""
         awk -F',' -v sym="{wildcards.symbol}" 'NR==1 {{next}} $1 == sym {{
             printf "Running for symbol=%s, organism=%s, db=%s\\n", $1, $3, $5;
@@ -467,7 +468,7 @@ rule blastp: # should we make a bastn rule and a blastn_db?
     disk_mb = lambda wildcards, attempt: 24 * 1024 * attempt,
     time = lambda wildcards, attempt: 8 * 60 * attempt,
     runtime = lambda wildcards, attempt: 8 * 60 * attempt,
-    allowed_jobs= lambda wildcards, attempt: BIGMEM_JOBS[attempt][1],
+    allowed_jobs = lambda wildcards, attempt: BIGMEM_JOBS[attempt][1],
     partition= lambda wildcards, attempt: BIGMEM_JOBS[attempt][0],
   conda: "envs/sebastian_env.yml"
   shell:
@@ -495,7 +496,7 @@ rule parse_blast_output:
     disk_mb = lambda wildcards, attempt: 24 * 1024 * attempt,
     time = lambda wildcards, attempt: 8 * 60 * attempt,
     runtime = lambda wildcards, attempt: 8 * 60 * attempt,
-    allowed_jobs= lambda wildcards, attempt: BIGMEM_JOBS[attempt][1],
+    allowed_jobs = lambda wildcards, attempt: BIGMEM_JOBS[attempt][1],
     partition= lambda wildcards, attempt: BIGMEM_JOBS[attempt][0],
   conda: "envs/sebastian_env.yml"
   shell:
@@ -506,7 +507,7 @@ rule parse_blast_output:
       --verbose
     """
 
-    # look at this py script to see what output files. I need a contigs list fna file for downstream rules
+# I need the faa contigs in the fna format for downstream rules
 rule make_contig_list: 
   input:
     blastp_hits = "{o}/blastp_results/{symbol}_blast_filtered.csv",
@@ -523,7 +524,7 @@ rule make_contig_list:
     disk_mb = lambda wildcards, attempt: 24 * 1024 * attempt,
     time = lambda wildcards, attempt: 8 * 60 * attempt,
     runtime = lambda wildcards, attempt: 8 * 60 * attempt,
-    allowed_jobs= lambda wildcards, attempt: BIGMEM_JOBS[attempt][1],
+    allowed_jobs = lambda wildcards, attempt: BIGMEM_JOBS[attempt][1],
     partition= lambda wildcards, attempt: BIGMEM_JOBS[attempt][0],
   conda: "envs/sebastian_env.yml"
   shell:
@@ -536,22 +537,6 @@ rule make_contig_list:
       --outdir {params.contiglist_dir} \
       --possible-samples {SAMPLES}
     """
-
-#rule touchie_touchie:
-#    input:
-#        contiglist_csv = "{o}/contiglists/{symbol}_contiglist.csv",
-#    output:
-#        contiglist_fna = "{o}/contiglists/{sample}.x.{symbol}.contiglist.fna"
-#    resources:
-#        mem_mb = lambda wildcards, attempt: 1 * 1024 * attempt,
-#        disk_mb = lambda wildcards, attempt: 1 * 1024 * attempt,
-#        time = lambda wildcards, attempt: 1 * 60 * attempt,
-#        runtime = lambda wildcards, attempt: 1 * 60 * attempt,
-#        allowed_jobs= lambda wildcards, attempt: BIGMEM_JOBS[attempt][1],
-#        partition= lambda wildcards, attempt: BIGMEM_JOBS[attempt][0],
-#    shell:"""
-#        touch {output.contiglist_fna}
-#    """
 
 rule minimap2:
   input:
@@ -568,8 +553,8 @@ rule minimap2:
     disk_mb = lambda wildcards, attempt: 24 * 1024 * attempt,
     time = lambda wildcards, attempt: 8 * 60 * attempt,
     runtime = lambda wildcards, attempt: 8 * 60 * attempt,
-    allowed_jobs= lambda wildcards, attempt: BIGMEM_JOBS[attempt][1],
-    partition= lambda wildcards, attempt: BIGMEM_JOBS[attempt][0],
+    allowed_jobs = lambda wildcards, attempt: HICPUS_JOBS[attempt][1],
+    partition= lambda wildcards, attempt: HICPUS_JOBS[attempt][0],
   conda: "envs/sebastian_env.yml"
   shell:
     """
@@ -586,12 +571,12 @@ rule index_bam:
     sorted_bai = temporary("{o}/mapped_reads/{sample}.x.{symbol}.sorted.bam.bai"),
   conda: "envs/sebastian_env.yml"
   resources:
-    mem_mb = lambda wildcards, attempt: 24 * 1024 * attempt,
-    disk_mb = lambda wildcards, attempt: 24 * 1024 * attempt,
-    time = lambda wildcards, attempt: 8 * 60 * attempt,
-    runtime = lambda wildcards, attempt: 8 * 60 * attempt,
-    allowed_jobs= lambda wildcards, attempt: BIGMEM_JOBS[attempt][1],
-    partition= lambda wildcards, attempt: BIGMEM_JOBS[attempt][0],
+    mem_mb = lambda wildcards, attempt: 16 * 1024 * attempt,
+    disk_mb = lambda wildcards, attempt: 16 * 1024 * attempt,
+    time = lambda wildcards, attempt: 4 * 60 * attempt,
+    runtime = lambda wildcards, attempt: 4 * 60 * attempt,
+    allowed_jobs = lambda wildcards, attempt: BIGMEM_JOBS[attempt][1],
+    partition= lambda wildcards, attempt: HICPUS_JOBS[attempt][0],
   shell:
     """
     samtools index {input.sorted_bam}
@@ -607,13 +592,14 @@ rule reads_mapped:
     coverage = "{o}/mapped_reads/stats/{sample}.x.{symbol}_coverage_stats.tsv",
     ave_cov = "{o}/mapped_reads/stats/{sample}.x.{symbol}_average_coverage_stats.tsv",
   resources:
-    mem_mb = lambda wildcards, attempt: 24 * 1024 * attempt,
-    disk_mb = lambda wildcards, attempt: 24 * 1024 * attempt,
-    time = lambda wildcards, attempt: 8 * 60 * attempt,
-    runtime = lambda wildcards, attempt: 8 * 60 * attempt,
-    allowed_jobs= lambda wildcards, attempt: BIGMEM_JOBS[attempt][1],
-    partition= lambda wildcards, attempt: BIGMEM_JOBS[attempt][0],
+    mem_mb = lambda wildcards, attempt: 12 * 1024 * attempt,
+    disk_mb = lambda wildcards, attempt: 14 * 1024 * attempt,
+    time = lambda wildcards, attempt: 4 * 60 * attempt,
+    runtime = lambda wildcards, attempt: 4 * 60 * attempt,
+    allowed_jobs = lambda wildcards, attempt: BIGMEM_JOBS[attempt][1],
+    partition= lambda wildcards, attempt: HICPUS_JOBS[attempt][0],
   conda: "envs/sebastian_env.yml"
+  priority: 1
   shell:
     """
     (echo -e "contig\tlength\tmapped\tunmapped\tnet_mapped"; \
@@ -641,7 +627,7 @@ rule merge_stats:
     disk_mb = lambda wildcards, attempt: 4 * 1024 * attempt,
     time = lambda wildcards, attempt: 1 * 60 * attempt,
     runtime = lambda wildcards, attempt: 1 * 60 * attempt,
-    allowed_jobs= lambda wildcards, attempt: BIGMEM_JOBS[attempt][1],
+    allowed_jobs = lambda wildcards, attempt: BIGMEM_JOBS[attempt][1],
     partition= lambda wildcards, attempt: BIGMEM_JOBS[attempt][0],
   conda: "envs/sebastian_env.yml"
   shell:
@@ -665,7 +651,7 @@ rule merge_stats_wholistic:
     disk_mb = lambda wildcards, attempt: 4 * 1024 * attempt,
     time = lambda wildcards, attempt: 1 * 60 * attempt,
     runtime = lambda wildcards, attempt: 1 * 60 * attempt,
-    allowed_jobs= lambda wildcards, attempt: BIGMEM_JOBS[attempt][1],
+    allowed_jobs = lambda wildcards, attempt: BIGMEM_JOBS[attempt][1],
     partition= lambda wildcards, attempt: BIGMEM_JOBS[attempt][0],
   conda: "envs/sebastian_env.yml"
   shell:

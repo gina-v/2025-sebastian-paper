@@ -1,8 +1,8 @@
 sample_metadata: metadata/working_metadata.tsv
 
-gene_metadata: metadata/genes-to-get.csv
+gene_metadata: metadata/scg-controls.csv
 
 test: False
 
-output_directory: /group/ctbrowngrp/2025-ccbaumler-team-tartrate
+output_directory: /group/ctbrowngrp/2025-ccbaumler-team-tartrate/controls
 
